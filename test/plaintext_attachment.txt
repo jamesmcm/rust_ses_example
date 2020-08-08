@@ -1,0 +1,70 @@
+Return-Path: <jamesmcm03@gmail.com>
+Received: from mail-lj1-f179.google.com (mail-lj1-f179.google.com [209.85.208.179])
+ by inbound-smtp.eu-west-1.amazonaws.com with SMTP id 3pq90o33kqeuds1rmdoedidpoki6maobp1qe9mg1
+ for test@testjamesmcm.awsapps.com;
+ Sat, 08 Aug 2020 21:13:25 +0000 (UTC)
+Received-SPF: pass (spfCheck: domain of _spf.google.com designates 209.85.208.179 as permitted sender) client-ip=209.85.208.179; envelope-from=jamesmcm03@gmail.com; helo=mail-lj1-f179.google.com;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of _spf.google.com designates 209.85.208.179 as permitted sender) client-ip=209.85.208.179; envelope-from=jamesmcm03@gmail.com; helo=mail-lj1-f179.google.com;
+ dkim=pass header.i=@gmail.com;
+ dmarc=pass header.from=gmail.com;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFIVGlsUlBOUWsrVHJUZWZRL29IZlVPaHJxRW5zM0RmSWl4ZlVVSzhGWVlBTXFrUVF0UFNoK2wyZXdTckFTNWkzRUZsWFhNRTFEdG5NU3l6Rkg1ZGl0TVEwamUzOTJqLzNPckluV09DTEpzc3FlSURubWppN28zQ0xjTW1VeTFVU3A1TjE3YVIxY1BuaWVscjFTRjRWU24rVTdoVDM1dDJEWUVUMWxDRWg1MmxCakRJVkxUcS9IYnlTdC9RR3N5eFBXNVFzYWtRUEpLaU9IZm1ZWk5GTXVHOE5OWjdDOGVXTjFhd3pTZXJvL0trRDNSOWFzK21EdTBCa0t5eXZVbTJXcGVoeWszVG5XSEFyVmV3VWhGd1JoUyt6NUUydFpyOGlzODF1MVBwV1M1cEE9PQ==
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=nOiiD3NNOO+XfzKENC5+c2Oq4mlaRdRhyv4EhNfuXzGsJOXRQ/IwbXgeoGAMgKEsZkdNQIawK/rXputl5At9hotdPVQVMaQ6vMbODSyHVF0U9eTrvNtCaIIelHZyiuO7/H46+erGCZWMbFYrj0hZPsReIAGAZKzGgD+r971L6Uk=; c=relaxed/simple; s=shh3fegwg5fppqsuzphvschd53n6ihuv; d=amazonses.com; t=1596921205; v=1; bh=dih1Fl2x6JHaTceajw8RvVuAoiynx6zGxDedCDOtMGY=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+Received: by mail-lj1-f179.google.com with SMTP id w25so5706143ljo.12
+        for <test@testjamesmcm.awsapps.com>; Sat, 08 Aug 2020 14:13:25 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20161025;
+        h=mime-version:from:date:message-id:subject:to;
+        bh=dih1Fl2x6JHaTceajw8RvVuAoiynx6zGxDedCDOtMGY=;
+        b=H7ZXt4xOUNH0u0N5upbN3X6SfwN3p92N9HY0IprMbYqgfwIuu6suWyzPI8SH1YHeVY
+         9oYv2FfeIAkM6vj8L64P/Li1KyzbwGeXJnW5T5vnGuBEjZU3+BMPxeA1uW6p+5gWfkUP
+         8v52x0pjMCqlgdD4cKkvtCq/hV0akb0pQ5DrYOtjSZS7voCP2J+XzVivunbeBkWoMx2N
+         zrpwgzk2cwWMX9JAdfmwjGhrmkDRw11jLqFLOtli36xVv0J0HVqTpqvZwDx0xfyBaLfc
+         RtQc0c7CiWRHb3pfk2ZppKxs4Q+sc2OawTVbBiNYa8p97xwbXvamaXFLw7M6CdZmyA4T
+         vong==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20161025;
+        h=x-gm-message-state:mime-version:from:date:message-id:subject:to;
+        bh=dih1Fl2x6JHaTceajw8RvVuAoiynx6zGxDedCDOtMGY=;
+        b=Rw8jKmpM21NcsnZ6PLskBtuXtFAOnYf+DVrd4Z4wrfBMWnjvP8+o7Q1kH+ZlPwHwm6
+         2lT/KxInL1yEGEib7izhv7a6TCzk8Qf+ivHOm74S5dwixkvh1wz1ADsAqW5YEeRCwAwM
+         VSunHYD+X15lxMHtrwVQi77gNYF+JueJvJBJBKDyNCMwDVRi4yNeGTY6X1++lyVhUxXG
+         jb6URyuBQEORxrYWxddAq/3BgsFM92EsmiVPHnqAuTjvGJ2CCF5O2UDcroXchNOFVgTn
+         ZmeCnCCnLpjdCC3YDrrOtU34qpv/8104udw+0N+Pj4A6Rmh4JWaOusF9kBy4lH+WLGsc
+         8D5w==
+X-Gm-Message-State: AOAM533lI6VLZ3cMagruSMyvijYEHm/iVUVuSWUhSBQwn3dBtVBVwFLq
+	5+Qh8+/3NYHOYyglKqldDGyddYWmMsu3ifuy/ACmfg==
+X-Google-Smtp-Source: ABdhPJwE0h4tkidDoQTPFw9DPOCOkeAeBlBUUB2Aac3250hTT9zk3mxsVRvM+Hn+g4NhERulF5IMJ67G28ZH1miHbI4=
+X-Received: by 2002:a2e:9a91:: with SMTP id p17mr9360168lji.378.1596921204796;
+ Sat, 08 Aug 2020 14:13:24 -0700 (PDT)
+MIME-Version: 1.0
+From: James McMurray <jamesmcm03@gmail.com>
+Date: Sat, 8 Aug 2020 23:13:14 +0200
+Message-ID: <CAMJE-1u1A6rADDeoUsZnnB0iUCp7oEaTkQayhso=Bxc693u6=Q@mail.gmail.com>
+Subject: attachtest
+To: test@testjamesmcm.awsapps.com
+Content-Type: multipart/mixed; boundary="00000000000025ab0605ac643145"
+
+--00000000000025ab0605ac643145
+Content-Type: multipart/alternative; boundary="00000000000025ab0305ac643143"
+
+--00000000000025ab0305ac643143
+Content-Type: text/plain; charset="UTF-8"
+
+attachtest body
+
+--00000000000025ab0305ac643143
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">attachtest body</div>
+
+--00000000000025ab0305ac643143--
+--00000000000025ab0605ac643145
+Content-Type: text/plain; charset="US-ASCII"; name="test_attachment.txt"
+Content-Disposition: attachment; filename="test_attachment.txt"
+Content-Transfer-Encoding: base64
+Content-ID: <f_kdm5n1pg0>
+X-Attachment-Id: f_kdm5n1pg0
+
+cGxhaW50ZXh0Cgo=
+--00000000000025ab0605ac643145--

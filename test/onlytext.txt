@@ -1,0 +1,58 @@
+Return-Path: <jamesmcm03@gmail.com>
+Received: from mail-lj1-f169.google.com (mail-lj1-f169.google.com [209.85.208.169])
+ by inbound-smtp.eu-west-1.amazonaws.com with SMTP id amj58c0qamufqan5q1s6mcar4b1opj6squoi27o1
+ for test@testjamesmcm.awsapps.com;
+ Sat, 08 Aug 2020 20:55:09 +0000 (UTC)
+Received-SPF: pass (spfCheck: domain of _spf.google.com designates 209.85.208.169 as permitted sender) client-ip=209.85.208.169; envelope-from=jamesmcm03@gmail.com; helo=mail-lj1-f169.google.com;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of _spf.google.com designates 209.85.208.169 as permitted sender) client-ip=209.85.208.169; envelope-from=jamesmcm03@gmail.com; helo=mail-lj1-f169.google.com;
+ dkim=pass header.i=@gmail.com;
+ dmarc=pass header.from=gmail.com;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFGUUM5QXBxSzJxdU45YzVaT1RtQ1NRdGRNM3JESWhKcVhxaEI5RGxCd2dwZk9KOEVGR3dNREZOVFF6QWxDUjI3UXFMcitWZnYwQTQrUnVmaldXNmxaSGRYVmxEUDhCclBySkhlZnFrZEp3ck90bDc1d25ueUxCKzVNejJTb1lkRHAza3Q5WjdDMmVna3pteWsyUHpiZ1JHOEx3aDUzZXJOTUlzT3N3UDFUZmlneFMyRWZZbnhnUWJvMW9WeHVpMGN4MEc3dmRra3VQYW9OUUZzaGwxdXErQm5DNmtWa3V6UldoTmJUL2VTV2hvTFNuQ0hkZXdocjVzYWJKN1BIK3REWGFMYWp6aU9ZOExZTUcxbS93SGc4ZEtSZFY3Q05GT0VUdXZXeks2aWtHOUE9PQ==
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=leSKoXJtRldsjuZL9r8QEa+HBXnOlsNM2yK18MfmsTzwofoI5Qrdymc69yPYwpbsGvzwXWTkH6nhSrF56JCeeVumkM0I87HWg2JVbquef8yJMhBpdzNKXdRjSVNYwuFZUKPHaVIWa6nxK0VXWAsyEz8JDnquGO26n9oF8ISzinU=; c=relaxed/simple; s=shh3fegwg5fppqsuzphvschd53n6ihuv; d=amazonses.com; t=1596920110; v=1; bh=obXb1BVCYyM3odxiifBrG4X4J2hqriNPUkpaq62wIoI=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+Received: by mail-lj1-f169.google.com with SMTP id v9so5709083ljk.6
+        for <test@testjamesmcm.awsapps.com>; Sat, 08 Aug 2020 13:55:09 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20161025;
+        h=mime-version:from:date:message-id:subject:to;
+        bh=obXb1BVCYyM3odxiifBrG4X4J2hqriNPUkpaq62wIoI=;
+        b=DFQSISESD2bCDaP5B1OUTW4Zd9xRcIxtZs8YsK8Zw17BbolRnDdsTodEZ5/AQVqtH+
+         dd7hF4t+q8NHlh/nYPCywdTr0+yDy+BAdfNBuXRj26t4y4PP6Q8bgDOd+S3/Qgb23sI0
+         vxXPVbRix2zNwvQmyQfaywDbYLqfAKMEYaX6CnxMkp/9ry8fX403uKpEzdJAQSvNMuJS
+         +U5HmETHtNmHjGTXYuE1v7SCgKOYCG1y7ixa4GdoNd11lFBcEdJZbRWI3wToPN09ni53
+         XHIMXYG5aJOp4vBLzkFx/hui6KetxfgZM/GG1LF2kXgp1ficxOQW9ZPBdmO5CgEuzsOT
+         59Cw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20161025;
+        h=x-gm-message-state:mime-version:from:date:message-id:subject:to;
+        bh=obXb1BVCYyM3odxiifBrG4X4J2hqriNPUkpaq62wIoI=;
+        b=J0dRGqEkj6giZ1+u706s8V0ugUH1yfHXK+ugZg15LV8F8qLCopxV4aNU7wr4XO84P/
+         6Cs4SpohDzvw2EUIW595ph9sZqUQH/t49bYwX6O8rfzMqNtU4arYAUeJemXzh9fAtoSl
+         Ujh3EyIw1r0v5KvovXpxa/uYiPcowt6Wxa6ouBxZIQAWBl574MCf4sCIThcGFHChJskp
+         gzc5wbSDVWmMPg7f635hVCcyFfzYm1PZFRoGEkQez57ul8QpYJB8j6XU1+Oo5Mn7UrVb
+         pEga6vUTn2eqP3kYvA3j8KS71Kmx1xqVsQwYRC9CSuB/XHPxDWoAmgTh2HmsTK7ExoHq
+         aHlQ==
+X-Gm-Message-State: AOAM533Q9ASTrAGOFCceKw1SwtwGMBedZ6zY76fU1y0aIXsAjRmN/4bv
+	xlH23u04v9NBEugxaS295KuceI3EtSDzHbxCIQIEEA==
+X-Google-Smtp-Source: ABdhPJxEF0tVPoriaSteEW2t9dASpqgPsUwkA40w+EClQ4s8JX+RG91xeEqrR6b6qleDVCHiUks871fZ4G5l4DNyxcg=
+X-Received: by 2002:a2e:a54f:: with SMTP id e15mr7661255ljn.115.1596920108873;
+ Sat, 08 Aug 2020 13:55:08 -0700 (PDT)
+MIME-Version: 1.0
+From: James McMurray <jamesmcm03@gmail.com>
+Date: Sat, 8 Aug 2020 22:54:58 +0200
+Message-ID: <CAMJE-1uq35qGwMeMvryzpLXuN4htOHTDHt4kiLD-7K97XwFE7A@mail.gmail.com>
+Subject: testmail
+To: test@testjamesmcm.awsapps.com
+Content-Type: multipart/alternative; boundary="000000000000d2fb5805ac63efb8"
+
+--000000000000d2fb5805ac63efb8
+Content-Type: text/plain; charset="UTF-8"
+
+testbody
+
+--000000000000d2fb5805ac63efb8
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">testbody</div>
+
+--000000000000d2fb5805ac63efb8--
