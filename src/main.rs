@@ -46,7 +46,8 @@ fn handle_email(key: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lettre_email::EmailBuilder;
+    use lettre::message::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
+    use lettre::message::{header, Message, MultiPart, Part, SinglePart};
     use rusoto_core::Region;
     use rusoto_ses::Ses;
     use rusoto_ses::SesClient;
@@ -124,23 +125,50 @@ mod tests {
 
     #[tokio::test]
     async fn send_email() -> Result<()> {
-        let email = EmailBuilder::new()
+        let email = Message::builder()
             // Addresses can be specified by the tuple (email, alias)
-            .to(("jamesmcm03@gmail.com", "James McMurray"))
+            .to("James McMurray <jamesmcm03@gmail.com>".parse().unwrap())
             // ... or by an address only
-            .from(("test@testjamesmcm.awsapps.com", "SES Test"))
+            .from("SES Test <test@testjamesmcm.awsapps.com>".parse().unwrap())
             .subject("Hi, Hello world")
-            .text("Hello world.")
-            .attachment(
-                "plaintext".as_bytes(),
-                "plaintext.txt",
-                &mime::TEXT_PLAIN_UTF_8,
-            )?
-            .build()?;
+            .multipart(
+                MultiPart::mixed()
+                    .multipart(
+                        MultiPart::alternative()
+                            .singlepart(
+                                SinglePart::quoted_printable()
+                                    .header(header::ContentType(
+                                        "text/plain; charset=utf8".parse().unwrap(),
+                                    ))
+                                    .body("Email text2"),
+                            )
+                            .singlepart(
+                                SinglePart::eight_bit()
+                                    .header(header::ContentType(
+                                        "text/html; charset=utf8".parse().unwrap(),
+                                    ))
+                                    .body("<p><b>Email</b>, <i>text2</i>!</p>"),
+                            ),
+                    )
+                    .singlepart(
+                        SinglePart::base64()
+                            .header(header::ContentType(
+                                "text/plain; charset=utf8".parse().unwrap(),
+                            ))
+                            .header(lettre::message::header::ContentDisposition {
+                                disposition: DispositionType::Attachment,
+                                parameters: vec![DispositionParam::Filename(
+                                    Charset::Us_Ascii,
+                                    None, // The optional language tag (see `language-tag` crate)
+                                    b"attachedfile2.txt".to_vec(), // the actual bytes of the filename
+                                )],
+                            })
+                            .body("plaintext"),
+                    ),
+            )?;
 
-        let send_mail: lettre::SendableEmail = email.into();
-        let msg_string = send_mail.message_to_string()?;
-        println!("{}", &msg_string);
+        let msg_string = email.formatted();
+        println!("{}", std::str::from_utf8(&msg_string)?);
 
         let ses_client = SesClient::new(Region::EuWest1);
         let raw_message = rusoto_ses::RawMessage {

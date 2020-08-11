@@ -19,8 +19,7 @@ lambda_runtime = "0.2"
 percent-encoding = "2"
 anyhow = "1"
 mailparse = "0.12"
-lettre = "0.9.3"
-lettre_email = "0.9.4"
+lettre = { version = "0.10.0-alpha.0", default_features = false, features = ["rustls-tls", "builder"] }
 mime = "0.3.16"
 bytes = "0.5.6"
 tokio = {version = "0.2.21", default_features = false, features = ["blocking", "rt-threaded"]}
