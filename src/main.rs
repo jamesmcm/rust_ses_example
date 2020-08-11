@@ -17,6 +17,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+// Use serde enum to handle separate events?
+// https://serde.rs/enum-representations.html
+
 fn my_handler(
     e: aws_lambda_events::event::s3::S3Event,
     _c: lambda_runtime::Context,
@@ -43,6 +46,10 @@ fn handle_email(key: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lettre_email::EmailBuilder;
+    use rusoto_core::Region;
+    use rusoto_ses::Ses;
+    use rusoto_ses::SesClient;
     use std::fs::read_to_string;
 
     #[derive(Debug, Deserialize)]
@@ -112,6 +119,48 @@ mod tests {
             break;
         }
         assert_eq!(records[0].name, "Wii Sports");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn send_email() -> Result<()> {
+        let email = EmailBuilder::new()
+            // Addresses can be specified by the tuple (email, alias)
+            .to(("jamesmcm03@gmail.com", "James McMurray"))
+            // ... or by an address only
+            .from(("test@testjamesmcm.awsapps.com", "SES Test"))
+            .subject("Hi, Hello world")
+            .text("Hello world.")
+            .attachment(
+                "plaintext".as_bytes(),
+                "plaintext.txt",
+                &mime::TEXT_PLAIN_UTF_8,
+            )?
+            .build()?;
+
+        let send_mail: lettre::SendableEmail = email.into();
+        let msg_string = send_mail.message_to_string()?;
+        println!("{}", &msg_string);
+
+        let ses_client = SesClient::new(Region::EuWest1);
+        let raw_message = rusoto_ses::RawMessage {
+            data: bytes::Bytes::from(base64::encode(msg_string)),
+        };
+        let request = rusoto_ses::SendRawEmailRequest {
+            configuration_set_name: None,
+            destinations: None,
+            from_arn: None,
+            raw_message,
+            return_path_arn: None,
+            source: None,
+            source_arn: None,
+            tags: None,
+        };
+
+        let response = ses_client.send_raw_email(request).await;
+
+        println!("{:?}", response?);
+
         Ok(())
     }
 }
