@@ -1,6 +1,8 @@
 use anyhow::Result;
 use csv::Writer;
 use lambda_runtime::error::HandlerError;
+use lambda_runtime::lambda;
+use log::info;
 use mailparse::parse_mail;
 use percent_encoding::percent_decode_str;
 use rusoto_core::Region;
@@ -10,8 +12,18 @@ use serde::Serialize;
 use std::error::Error;
 use std::io::Cursor;
 use std::io::Read;
+use tokio::prelude::*;
+use tokio::runtime::Runtime;
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+enum EventEnum {
+    S3Event(aws_lambda_events::event::s3::S3Event),
+    CloudWatchEvent(aws_lambda_events::event::cloudwatch_events::CloudWatchEvent),
+}
 
 fn main() -> Result<()> {
+    pretty_env_logger::init();
     lambda_runtime::lambda!(my_handler);
 
     Ok(())
@@ -20,19 +32,24 @@ fn main() -> Result<()> {
 // Use serde enum to handle separate events?
 // https://serde.rs/enum-representations.html
 
-fn my_handler(
-    e: aws_lambda_events::event::s3::S3Event,
-    _c: lambda_runtime::Context,
-) -> Result<(), HandlerError> {
+fn my_handler(e: EventEnum, _c: lambda_runtime::Context) -> Result<(), HandlerError> {
     println!("{:?}", e);
-    let decodedkey = percent_decode_str(&(e.records[0].s3.object.key.as_ref()).unwrap())
-        .decode_utf8()
-        .unwrap();
+    match e {
+        EventEnum::CloudWatchEvent(event) => {
+            info!("Cloudwatch event: {:?}", event);
+        }
+        EventEnum::S3Event(event) => {
+            let decodedkey =
+                percent_decode_str(&(event.records[0].s3.object.key.as_ref()).unwrap())
+                    .decode_utf8()
+                    .unwrap();
 
-    match handle_email(&decodedkey) {
-        Ok(_) => (),
-        Err(error) => {
-            panic!("Error: {:?}", error);
+            match handle_email(&decodedkey) {
+                Ok(_) => (),
+                Err(error) => {
+                    panic!("Error: {:?}", error);
+                }
+            }
         }
     }
 
@@ -40,6 +57,7 @@ fn my_handler(
 }
 
 fn handle_email(key: &str) -> Result<()> {
+    info!("{}", key);
     Ok(())
 }
 
