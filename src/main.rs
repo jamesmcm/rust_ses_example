@@ -1,12 +1,20 @@
-use anyhow::Result;
+#[cfg(test)]
+mod tests;
+
+use anyhow::{anyhow, Result};
+use chrono::naive::NaiveDateTime;
 use csv::Writer;
 use lambda_runtime::error::HandlerError;
 use lambda_runtime::lambda;
-use log::info;
+use lettre::message::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
+use lettre::message::{header, Message, MultiPart, Part, SinglePart};
+use log::{debug, error, info, warn};
 use mailparse::parse_mail;
 use percent_encoding::percent_decode_str;
 use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, PutObjectRequest, S3Client, S3};
+use rusoto_ses::Ses;
+use rusoto_ses::SesClient;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
@@ -14,6 +22,19 @@ use std::io::Cursor;
 use std::io::Read;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
+
+static RECIPIENT: &str = "James McMurray <jamesmcm03@gmail.com>";
+static OUTPUT_BUCKET: &str = "test-file-output-bucket";
+static OUTPUT_KEY: &str = "current.csv";
+static FROM: &str = "SES Test <test@testjamesmcm.awsapps.com>";
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Entry {
+    #[serde(rename = "ID")]
+    id: u32,
+    start_date: NaiveDateTime,
+    end_date: NaiveDateTime,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -29,14 +50,18 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// Use serde enum to handle separate events?
-// https://serde.rs/enum-representations.html
-
 fn my_handler(e: EventEnum, _c: lambda_runtime::Context) -> Result<(), HandlerError> {
     println!("{:?}", e);
+    let s3_client = S3Client::new(Region::EuWest1);
+    let ses_client = SesClient::new(Region::EuWest1);
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
     match e {
         EventEnum::CloudWatchEvent(event) => {
             info!("Cloudwatch event: {:?}", event);
+            // Try to read file
+            //
+            // Send email
         }
         EventEnum::S3Event(event) => {
             let decodedkey =
@@ -44,9 +69,15 @@ fn my_handler(e: EventEnum, _c: lambda_runtime::Context) -> Result<(), HandlerEr
                     .decode_utf8()
                     .unwrap();
 
-            match handle_email(&decodedkey) {
+            let bucket = percent_decode_str(&(event.records[0].s3.bucket.name.as_ref()).unwrap())
+                .decode_utf8()
+                .unwrap();
+
+            // Rusoto above gives us Cows
+            match handle_email(&bucket, &decodedkey, &s3_client, &ses_client, &mut rt) {
                 Ok(_) => (),
                 Err(error) => {
+                    error!("Error: {:?}", error);
                     panic!("Error: {:?}", error);
                 }
             }
@@ -56,157 +87,270 @@ fn my_handler(e: EventEnum, _c: lambda_runtime::Context) -> Result<(), HandlerEr
     Ok(())
 }
 
-fn handle_email(key: &str) -> Result<()> {
-    info!("{}", key);
+fn handle_email(
+    bucket: &str,
+    key: &str,
+    s3_client: &S3Client,
+    ses_client: &SesClient,
+    rt: &mut tokio::runtime::Runtime,
+) -> Result<()> {
+    // Read S3 file
+    let file = get_file_from_s3(bucket, key, s3_client, rt)?;
+
+    let keypath = std::path::PathBuf::from(key);
+    let file_name = keypath.file_name().unwrap().to_str().unwrap().to_string();
+    // Parse file and read attachment
+    let cap = parse_mail(&file)?;
+    let attachment = cap
+        .subparts
+        .into_iter()
+        .filter(|x| {
+            x.get_content_disposition().disposition == mailparse::DispositionType::Attachment
+        })
+        .next()
+        .expect("No attachment")
+        .get_body()?;
+    let mut rdr = csv::Reader::from_reader(Cursor::new(attachment.trim()));
+    let mut records: Vec<Entry> = Vec::with_capacity(16);
+
+    let mut de_errors: Vec<csv::Error> = Vec::new();
+    for result in rdr.deserialize() {
+        // TODO: Handle errors
+        match result {
+            Ok(record) => {
+                records.push(record);
+            }
+            Err(error) => de_errors.push(error),
+        }
+    }
+
+    // Validate records
+    let validation_errors = records
+        .iter()
+        .map(|x| validate_record(x))
+        .filter(|x| x.is_err())
+        .collect::<Vec<_>>();
+
+    // Send errors email
+    if !validation_errors.is_empty() || !de_errors.is_empty() {
+        let mut de_string = String::new();
+        let mut validation_string = String::new();
+        if !de_errors.is_empty() {
+            de_string = format!(
+                "Deserialization errors:\n{}",
+                de_errors
+                    .iter()
+                    .map(|x| format!("{:?}", x))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
+        }
+        if !validation_errors.is_empty() {
+            validation_string = format!(
+                "Validation errors:\n{}",
+                validation_errors
+                    .iter()
+                    .map(|x| format!("{:?}", x))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
+        }
+
+        send_email(
+            RECIPIENT,
+            "Errors in file",
+            &format!(
+                "Errors found in attached file:\n{}\n{}",
+                de_string, validation_string
+            ),
+            None,
+            Some(Attachment {
+                attachment: attachment.as_bytes().to_vec(),
+                name: file_name.clone(),
+                mime: "text/csv; charset=utf8".to_string(),
+            }),
+            ses_client,
+            rt,
+        )?;
+
+        warn!(
+            "Errors found in attached file:\n{}\n{}",
+            de_string, validation_string
+        );
+        return Ok(());
+    }
+
+    // Write CSV to S3
+    let mut wtr = Writer::from_writer(vec![]);
+    for r in records {
+        wtr.serialize(r)?;
+    }
+
+    let file: Vec<u8> = wtr.into_inner()?;
+    write_file_to_s3(file.clone(), OUTPUT_BUCKET, OUTPUT_KEY, s3_client, rt)?;
+    // Send confirmation
+
+    send_email(
+        RECIPIENT,
+        "File updated successfully!",
+        "File updated successfully!\nAttached for reference.",
+        None,
+        Some(Attachment {
+            attachment: file,
+            name: file_name,
+            mime: "text/csv; charset=utf8".to_string(),
+        }),
+        ses_client,
+        rt,
+    )?;
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lettre::message::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
-    use lettre::message::{header, Message, MultiPart, Part, SinglePart};
-    use rusoto_core::Region;
-    use rusoto_ses::Ses;
-    use rusoto_ses::SesClient;
-    use std::fs::read_to_string;
-
-    #[derive(Debug, Deserialize)]
-    struct Record {
-        #[serde(rename = "Rank")]
-        rank: u32,
-        #[serde(rename = "Name")]
-        name: String,
-        #[serde(rename = "Platform")]
-        platform: String,
-        #[serde(rename = "Year")]
-        year: String,
-    }
-
-    #[test]
-    fn test_get_subject() -> Result<()> {
-        let file = read_to_string("test/onlytext.txt")?;
-        let cap = parse_mail(file.as_bytes())?;
-        assert_eq!(
-            cap.headers
-                .iter()
-                .filter(|x| x.get_key() == "Subject")
-                .map(|x| x.get_value())
-                .next()
-                .unwrap(),
-            "testmail"
-        );
+fn validate_record(r: &Entry) -> Result<()> {
+    if r.start_date > r.end_date {
+        Err(anyhow!(
+            "Start date after end date for entry: {}, {}, {}",
+            r.id,
+            r.start_date,
+            r.end_date
+        ))
+    } else {
         Ok(())
     }
+}
 
-    #[test]
-    fn test_text_attachment() -> Result<()> {
-        let file = read_to_string("test/plaintext_attachment.txt")?;
-        let cap = parse_mail(file.as_bytes())?;
-        let attachment = cap
-            .subparts
-            .into_iter()
-            .filter(|x| {
-                x.get_content_disposition().disposition == mailparse::DispositionType::Attachment
-            })
-            .next()
-            .expect("No attachment")
-            .get_body()?;
+fn get_file_from_s3(
+    bucket: &str,
+    key: &str,
+    s3_client: &S3Client,
+    rt: &mut tokio::runtime::Runtime,
+) -> Result<Vec<u8>> {
+    info!("Reading bucket: {}, key: {}", bucket, key);
+    let s3file_fut = s3_client.get_object(GetObjectRequest {
+        bucket: bucket.to_string(),
+        key: key.to_string(),
+        ..Default::default()
+    });
 
-        assert_eq!(attachment.trim(), "plaintext");
-        Ok(())
-    }
+    let s3file = rt.block_on(s3file_fut)?;
 
-    #[test]
-    fn test_large_csv() -> Result<()> {
-        let file = read_to_string("test/largecsv.txt")?;
-        let cap = parse_mail(file.as_bytes())?;
-        let attachment = cap
-            .subparts
-            .into_iter()
-            .filter(|x| {
-                x.get_content_disposition().disposition == mailparse::DispositionType::Attachment
-            })
-            .next()
-            .expect("No attachment")
-            .get_body()?;
-        let mut rdr = csv::Reader::from_reader(Cursor::new(attachment.trim()));
-        let mut records: Vec<Record> = Vec::with_capacity(5);
-        for result in rdr.deserialize() {
-            let record: Record = result?;
-            records.push(record);
-            break;
-        }
-        assert_eq!(records[0].name, "Wii Sports");
-        Ok(())
-    }
+    let mut buffer: Vec<u8> = Vec::new();
+    let _file = s3file
+        .body
+        .unwrap()
+        .into_blocking_read()
+        .read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
 
-    #[tokio::test]
-    async fn send_email() -> Result<()> {
-        let email = Message::builder()
-            // Addresses can be specified by the tuple (email, alias)
-            .to("James McMurray <jamesmcm03@gmail.com>".parse().unwrap())
-            // ... or by an address only
-            .from("SES Test <test@testjamesmcm.awsapps.com>".parse().unwrap())
-            .subject("Hi, Hello world")
-            .multipart(
-                MultiPart::mixed()
-                    .multipart(
-                        MultiPart::alternative()
-                            .singlepart(
-                                SinglePart::quoted_printable()
-                                    .header(header::ContentType(
-                                        "text/plain; charset=utf8".parse().unwrap(),
-                                    ))
-                                    .body("Email text2"),
-                            )
-                            .singlepart(
-                                SinglePart::eight_bit()
-                                    .header(header::ContentType(
-                                        "text/html; charset=utf8".parse().unwrap(),
-                                    ))
-                                    .body("<p><b>Email</b>, <i>text2</i>!</p>"),
-                            ),
-                    )
-                    .singlepart(
-                        SinglePart::base64()
-                            .header(header::ContentType(
-                                "text/plain; charset=utf8".parse().unwrap(),
-                            ))
-                            .header(lettre::message::header::ContentDisposition {
-                                disposition: DispositionType::Attachment,
-                                parameters: vec![DispositionParam::Filename(
-                                    Charset::Us_Ascii,
-                                    None, // The optional language tag (see `language-tag` crate)
-                                    b"attachedfile2.txt".to_vec(), // the actual bytes of the filename
-                                )],
-                            })
-                            .body("plaintext"),
-                    ),
-            )?;
+fn write_file_to_s3(
+    file: Vec<u8>,
+    bucket: &str,
+    key: &str,
+    s3_client: &S3Client,
+    rt: &mut tokio::runtime::Runtime,
+) -> Result<()> {
+    let fut = s3_client.put_object(PutObjectRequest {
+        bucket: bucket.to_string(),
+        key: key.to_string(),
+        body: Some(file.into()),
+        ..Default::default()
+    });
+    let _response = rt.block_on(fut)?;
+    Ok(())
+}
 
-        let msg_string = email.formatted();
-        println!("{}", std::str::from_utf8(&msg_string)?);
+struct Attachment {
+    attachment: Vec<u8>,
+    name: String,
+    mime: String, // "text/csv; charset=utf8"
+}
 
-        let ses_client = SesClient::new(Region::EuWest1);
-        let raw_message = rusoto_ses::RawMessage {
-            data: bytes::Bytes::from(base64::encode(msg_string)),
-        };
-        let request = rusoto_ses::SendRawEmailRequest {
-            configuration_set_name: None,
-            destinations: None,
-            from_arn: None,
-            raw_message,
-            return_path_arn: None,
-            source: None,
-            source_arn: None,
-            tags: None,
-        };
+fn send_email(
+    recipient: &str,
+    subject: &str,
+    plain_body: &str,
+    html_body: Option<&str>,
+    attachment: Option<Attachment>,
+    ses_client: &SesClient,
+    rt: &mut tokio::runtime::Runtime,
+) -> Result<()> {
+    let email = Message::builder()
+        .to(recipient.parse().unwrap())
+        .from(FROM.parse().unwrap())
+        .subject(subject);
 
-        let response = ses_client.send_raw_email(request).await;
+    // TODO Also simplify to only single part if both HTML and Attachment are None
+    let mpart = if html_body.is_some() {
+        MultiPart::mixed().multipart(
+            MultiPart::alternative()
+                .singlepart(
+                    SinglePart::quoted_printable()
+                        .header(header::ContentType(
+                            "text/plain; charset=utf8".parse().unwrap(),
+                        ))
+                        .body(plain_body),
+                )
+                .singlepart(
+                    SinglePart::eight_bit()
+                        .header(header::ContentType(
+                            "text/html; charset=utf8".parse().unwrap(),
+                        ))
+                        .body(html_body.unwrap()),
+                ),
+        )
+    } else {
+        MultiPart::mixed().singlepart(
+            SinglePart::quoted_printable()
+                .header(header::ContentType(
+                    "text/plain; charset=utf8".parse().unwrap(),
+                ))
+                .body(plain_body),
+        )
+    };
+    let mpart = if attachment.is_some() {
+        mpart.singlepart(
+            SinglePart::base64()
+                .header(header::ContentType(
+                    attachment.as_ref().unwrap().mime.parse().unwrap(),
+                ))
+                .header(lettre::message::header::ContentDisposition {
+                    disposition: DispositionType::Attachment,
+                    parameters: vec![DispositionParam::Filename(
+                        Charset::Us_Ascii,
+                        None,
+                        attachment.as_ref().unwrap().name.as_bytes().to_vec(), // the actual bytes of the filename
+                    )],
+                })
+                .body(attachment.unwrap().attachment),
+        )
+    } else {
+        mpart
+    };
 
-        println!("{:?}", response?);
+    let email = email.multipart(mpart)?;
 
-        Ok(())
-    }
+    let msg_string = email.formatted();
+    debug!("Raw email: {}", std::str::from_utf8(&msg_string)?);
+
+    let raw_message = rusoto_ses::RawMessage {
+        data: bytes::Bytes::from(base64::encode(msg_string)),
+    };
+    let request = rusoto_ses::SendRawEmailRequest {
+        configuration_set_name: None,
+        destinations: None,
+        from_arn: None,
+        raw_message,
+        return_path_arn: None,
+        source: None,
+        source_arn: None,
+        tags: None,
+    };
+
+    let fut = ses_client.send_raw_email(request);
+
+    let response = rt.block_on(fut)?;
+    info!("Email sent: {:?}", response);
+
+    Ok(())
 }
