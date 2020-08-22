@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests;
 
+// TODO: Make it work with replies - i.e. use replies to CW email, confirmation is sent as reply to
+// that email
+
 use anyhow::{anyhow, Result};
 use chrono::naive::NaiveDateTime;
 use csv::Writer;
@@ -44,7 +47,9 @@ enum EventEnum {
 }
 
 fn main() -> Result<()> {
-    pretty_env_logger::init();
+    let mut builder = pretty_env_logger::formatted_timed_builder();
+    builder.filter_level(log::LevelFilter::Debug);
+    builder.init();
     lambda_runtime::lambda!(my_handler);
 
     Ok(())
@@ -59,9 +64,37 @@ fn my_handler(e: EventEnum, _c: lambda_runtime::Context) -> Result<(), HandlerEr
     match e {
         EventEnum::CloudWatchEvent(event) => {
             info!("Cloudwatch event: {:?}", event);
+            let file = get_file_from_s3(OUTPUT_BUCKET, OUTPUT_KEY, &s3_client, &mut rt).ok();
             // Try to read file
             //
             // Send email
+            if file.is_some() {
+                send_email(
+                    RECIPIENT,
+                    "Please verify and update attached file",
+                    "Please verify and update the attached file",
+                    None,
+                    Some(Attachment {
+                        attachment: file.unwrap(),
+                        name: OUTPUT_KEY.to_string(),
+                        mime: "text/csv; charset=utf8".to_string(),
+                    }),
+                    &ses_client,
+                    &mut rt,
+                )
+                .ok();
+            } else {
+                send_email(
+                    RECIPIENT,
+                    "Please reply with file",
+                    "Please reply with file",
+                    None,
+                    None,
+                    &ses_client,
+                    &mut rt,
+                )
+                .ok();
+            }
         }
         EventEnum::S3Event(event) => {
             let decodedkey =
@@ -108,8 +141,18 @@ fn handle_email(
             x.get_content_disposition().disposition == mailparse::DispositionType::Attachment
         })
         .next()
-        .expect("No attachment")
-        .get_body()?;
+        .expect("No attachment");
+
+    // TODO: Notify on missing attachment case
+    let attachment_name = attachment
+        .get_content_disposition()
+        .params
+        .get("filename")
+        .expect("No filename")
+        .to_string();
+
+    let attachment = attachment.get_body()?;
+
     let mut rdr = csv::Reader::from_reader(Cursor::new(attachment.trim()));
     let mut records: Vec<Entry> = Vec::with_capacity(16);
 
@@ -158,7 +201,7 @@ fn handle_email(
 
         send_email(
             RECIPIENT,
-            "Errors in file",
+            &format!("Errors in file: {}", attachment_name),
             &format!(
                 "Errors found in attached file:\n{}\n{}",
                 de_string, validation_string
@@ -166,7 +209,7 @@ fn handle_email(
             None,
             Some(Attachment {
                 attachment: attachment.as_bytes().to_vec(),
-                name: file_name.clone(),
+                name: attachment_name.clone(),
                 mime: "text/csv; charset=utf8".to_string(),
             }),
             ses_client,
