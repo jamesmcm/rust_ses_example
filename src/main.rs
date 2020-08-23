@@ -2,15 +2,14 @@
 mod tests;
 
 // TODO: Make it work with replies - i.e. use replies to CW email, confirmation is sent as reply to
-// that email
+// that email - In-Reply-To, References
 
 use anyhow::{anyhow, Result};
 use chrono::naive::NaiveDateTime;
 use csv::Writer;
 use lambda_runtime::error::HandlerError;
-use lambda_runtime::lambda;
-use lettre::message::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
-use lettre::message::{header, Message, MultiPart, Part, SinglePart};
+use lettre::message::header::{Charset, DispositionParam, DispositionType};
+use lettre::message::{header, Message, MultiPart, SinglePart};
 use log::{debug, error, info, warn};
 use mailparse::parse_mail;
 use percent_encoding::percent_decode_str;
@@ -20,11 +19,8 @@ use rusoto_ses::Ses;
 use rusoto_ses::SesClient;
 use serde::Deserialize;
 use serde::Serialize;
-use std::error::Error;
 use std::io::Cursor;
 use std::io::Read;
-use tokio::prelude::*;
-use tokio::runtime::Runtime;
 
 static RECIPIENT: &str = "James McMurray <jamesmcm03@gmail.com>";
 static OUTPUT_BUCKET: &str = "test-file-output-bucket";
@@ -35,9 +31,9 @@ static FROM: &str = "SES Test <test@testjamesmcm.awsapps.com>";
 struct Entry {
     #[serde(alias = "ID")]
     id: u32,
-    #[serde(deserialize_with = "de_datetime")]
+    #[serde(deserialize_with = "de_datetime", serialize_with = "se_datetime")]
     start_date: NaiveDateTime,
-    #[serde(deserialize_with = "de_datetime")]
+    #[serde(deserialize_with = "de_datetime", serialize_with = "se_datetime")]
     end_date: NaiveDateTime,
 }
 
@@ -51,6 +47,15 @@ where
         Err(x) => Err(serde::de::Error::custom(x)),
     }
 }
+
+fn se_datetime<S>(dt: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let t = dt.format("%Y-%m-%d %H:%M:%S").to_string();
+    serializer.collect_str(&t)
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum EventEnum {
@@ -252,7 +257,7 @@ fn handle_email(
         None,
         Some(Attachment {
             attachment: file,
-            name: file_name,
+            name: attachment_name,
             mime: "text/csv; charset=utf8".to_string(),
         }),
         ses_client,
