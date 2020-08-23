@@ -31,14 +31,26 @@ static OUTPUT_BUCKET: &str = "test-file-output-bucket";
 static OUTPUT_KEY: &str = "current.csv";
 static FROM: &str = "SES Test <test@testjamesmcm.awsapps.com>";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 struct Entry {
-    #[serde(rename = "ID")]
+    #[serde(alias = "ID")]
     id: u32,
+    #[serde(deserialize_with = "de_datetime")]
     start_date: NaiveDateTime,
+    #[serde(deserialize_with = "de_datetime")]
     end_date: NaiveDateTime,
 }
 
+fn de_datetime<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    match NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S") {
+        Ok(x) => Ok(x),
+        Err(x) => Err(serde::de::Error::custom(x)),
+    }
+}
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum EventEnum {

@@ -78,6 +78,7 @@ fn test_large_csv() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn send_email() -> Result<()> {
     let email = Message::builder()
         // Addresses can be specified by the tuple (email, alias)
@@ -143,5 +144,31 @@ async fn send_email() -> Result<()> {
 
     println!("{:?}", response?);
 
+    Ok(())
+}
+
+#[test]
+fn deserialize_with_date() -> Result<()> {
+    let attachment = read_to_string("test/testcsv_date.csv")?;
+    let mut rdr = csv::Reader::from_reader(Cursor::new(attachment.trim()));
+    let mut records: Vec<Entry> = Vec::with_capacity(16);
+
+    for result in rdr.deserialize() {
+        records.push(result?);
+    }
+    assert_eq!(
+        records[0],
+        Entry {
+            id: 1,
+            start_date: chrono::naive::NaiveDateTime::parse_from_str(
+                "2020-08-23 09:00:00",
+                "%Y-%m-%d %H:%M:%S",
+            )?,
+            end_date: chrono::naive::NaiveDateTime::parse_from_str(
+                "2020-08-23 17:00:00",
+                "%Y-%m-%d %H:%M:%S",
+            )?,
+        },
+    );
     Ok(())
 }
