@@ -37,7 +37,6 @@ pub fn deserialize_csv(attachment: &str) -> (Vec<Entry>, Vec<csv::Error>) {
     let mut records: Vec<Entry> = Vec::with_capacity(16);
     let mut de_errors: Vec<csv::Error> = Vec::new();
     for result in rdr.deserialize() {
-        // TODO: Handle errors
         match result {
             Ok(record) => {
                 records.push(record);
@@ -62,10 +61,10 @@ fn validate_record(r: &Entry) -> Result<()> {
     }
 }
 
-pub fn validate_all_records(records: &[Entry]) -> Vec<Result<()>> {
+pub fn validate_all_records(records: &[Entry]) -> Vec<anyhow::Error> {
     records
         .iter()
         .map(|x| validate_record(x))
-        .filter(|x| x.is_err())
-        .collect::<Vec<_>>()
+        .filter_map(|x| x.err())
+        .collect()
 }

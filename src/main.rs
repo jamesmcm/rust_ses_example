@@ -119,7 +119,8 @@ fn handle_email(
     // Read S3 file
     let file = get_file_from_s3(bucket, key, s3_client, rt)?;
 
-    // Parse file and read attachment
+    // Parse file and read first attachment
+    // TODO: Handle case for multiple attachments
     let cap = parse_mail(&file)?;
     let attachment = cap
         .subparts
