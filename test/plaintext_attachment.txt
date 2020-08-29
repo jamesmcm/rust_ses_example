@@ -1,17 +1,17 @@
-Return-Path: <jamesmcm03@gmail.com>
+Return-Path: <SENDER_EMAIL@test.com>
 Received: from mail-lj1-f179.google.com (mail-lj1-f179.google.com [209.85.208.179])
  by inbound-smtp.eu-west-1.amazonaws.com with SMTP id 3pq90o33kqeuds1rmdoedidpoki6maobp1qe9mg1
- for test@testjamesmcm.awsapps.com;
+ for test@testses.awsapps.com;
  Sat, 08 Aug 2020 21:13:25 +0000 (UTC)
-Received-SPF: pass (spfCheck: domain of _spf.google.com designates 209.85.208.179 as permitted sender) client-ip=209.85.208.179; envelope-from=jamesmcm03@gmail.com; helo=mail-lj1-f179.google.com;
+Received-SPF: pass (spfCheck: domain of _spf.google.com designates 209.85.208.179 as permitted sender) client-ip=209.85.208.179; envelope-from=SENDER_EMAIL@test.com; helo=mail-lj1-f179.google.com;
 Authentication-Results: amazonses.com;
- spf=pass (spfCheck: domain of _spf.google.com designates 209.85.208.179 as permitted sender) client-ip=209.85.208.179; envelope-from=jamesmcm03@gmail.com; helo=mail-lj1-f179.google.com;
+ spf=pass (spfCheck: domain of _spf.google.com designates 209.85.208.179 as permitted sender) client-ip=209.85.208.179; envelope-from=SENDER_EMAIL@test.com; helo=mail-lj1-f179.google.com;
  dkim=pass header.i=@gmail.com;
  dmarc=pass header.from=gmail.com;
 X-SES-RECEIPT: AEFBQUFBQUFBQUFIVGlsUlBOUWsrVHJUZWZRL29IZlVPaHJxRW5zM0RmSWl4ZlVVSzhGWVlBTXFrUVF0UFNoK2wyZXdTckFTNWkzRUZsWFhNRTFEdG5NU3l6Rkg1ZGl0TVEwamUzOTJqLzNPckluV09DTEpzc3FlSURubWppN28zQ0xjTW1VeTFVU3A1TjE3YVIxY1BuaWVscjFTRjRWU24rVTdoVDM1dDJEWUVUMWxDRWg1MmxCakRJVkxUcS9IYnlTdC9RR3N5eFBXNVFzYWtRUEpLaU9IZm1ZWk5GTXVHOE5OWjdDOGVXTjFhd3pTZXJvL0trRDNSOWFzK21EdTBCa0t5eXZVbTJXcGVoeWszVG5XSEFyVmV3VWhGd1JoUyt6NUUydFpyOGlzODF1MVBwV1M1cEE9PQ==
 X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=nOiiD3NNOO+XfzKENC5+c2Oq4mlaRdRhyv4EhNfuXzGsJOXRQ/IwbXgeoGAMgKEsZkdNQIawK/rXputl5At9hotdPVQVMaQ6vMbODSyHVF0U9eTrvNtCaIIelHZyiuO7/H46+erGCZWMbFYrj0hZPsReIAGAZKzGgD+r971L6Uk=; c=relaxed/simple; s=shh3fegwg5fppqsuzphvschd53n6ihuv; d=amazonses.com; t=1596921205; v=1; bh=dih1Fl2x6JHaTceajw8RvVuAoiynx6zGxDedCDOtMGY=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
 Received: by mail-lj1-f179.google.com with SMTP id w25so5706143ljo.12
-        for <test@testjamesmcm.awsapps.com>; Sat, 08 Aug 2020 14:13:25 -0700 (PDT)
+        for <test@testses.awsapps.com>; Sat, 08 Aug 2020 14:13:25 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
         d=gmail.com; s=20161025;
         h=mime-version:from:date:message-id:subject:to;
@@ -38,11 +38,11 @@ X-Google-Smtp-Source: ABdhPJwE0h4tkidDoQTPFw9DPOCOkeAeBlBUUB2Aac3250hTT9zk3mxsVR
 X-Received: by 2002:a2e:9a91:: with SMTP id p17mr9360168lji.378.1596921204796;
  Sat, 08 Aug 2020 14:13:24 -0700 (PDT)
 MIME-Version: 1.0
-From: James McMurray <jamesmcm03@gmail.com>
+From: SENDER NAME <SENDER_EMAIL@test.com>
 Date: Sat, 8 Aug 2020 23:13:14 +0200
 Message-ID: <CAMJE-1u1A6rADDeoUsZnnB0iUCp7oEaTkQayhso=Bxc693u6=Q@mail.gmail.com>
 Subject: attachtest
-To: test@testjamesmcm.awsapps.com
+To: test@testses.awsapps.com
 Content-Type: multipart/mixed; boundary="00000000000025ab0605ac643145"
 
 --00000000000025ab0605ac643145

@@ -1,11 +1,13 @@
 #[cfg(test)]
 use super::*;
-use lettre::message::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
-use lettre::message::{header, Message, MultiPart, Part, SinglePart};
+use crate::csv_serde::Entry;
+use lettre::message::header::{Charset, DispositionParam, DispositionType};
+use lettre::message::{header, Message, MultiPart, SinglePart};
 use rusoto_core::Region;
 use rusoto_ses::Ses;
 use rusoto_ses::SesClient;
 use std::fs::read_to_string;
+use std::io::Cursor;
 
 #[derive(Debug, Deserialize)]
 struct Record {
@@ -42,10 +44,7 @@ fn test_text_attachment() -> Result<()> {
     let attachment = cap
         .subparts
         .into_iter()
-        .filter(|x| {
-            x.get_content_disposition().disposition == mailparse::DispositionType::Attachment
-        })
-        .next()
+        .find(|x| x.get_content_disposition().disposition == mailparse::DispositionType::Attachment)
         .expect("No attachment")
         .get_body()?;
 
@@ -60,19 +59,16 @@ fn test_large_csv() -> Result<()> {
     let attachment = cap
         .subparts
         .into_iter()
-        .filter(|x| {
-            x.get_content_disposition().disposition == mailparse::DispositionType::Attachment
-        })
-        .next()
+        .find(|x| x.get_content_disposition().disposition == mailparse::DispositionType::Attachment)
         .expect("No attachment")
         .get_body()?;
     let mut rdr = csv::Reader::from_reader(Cursor::new(attachment.trim()));
     let mut records: Vec<Record> = Vec::with_capacity(5);
-    for result in rdr.deserialize() {
-        let record: Record = result?;
-        records.push(record);
-        break;
-    }
+
+    let mut result = rdr.deserialize();
+    let record: Record = result.next().unwrap()?;
+    records.push(record);
+
     assert_eq!(records[0].name, "Wii Sports");
     Ok(())
 }
@@ -82,9 +78,9 @@ fn test_large_csv() -> Result<()> {
 async fn send_email() -> Result<()> {
     let email = Message::builder()
         // Addresses can be specified by the tuple (email, alias)
-        .to("James McMurray <jamesmcm03@gmail.com>".parse().unwrap())
+        .to(RECIPIENT.parse().unwrap())
         // ... or by an address only
-        .from("SES Test <test@testjamesmcm.awsapps.com>".parse().unwrap())
+        .from(FROM.parse().unwrap())
         .subject("Hi, Hello world")
         .multipart(
             MultiPart::mixed()
